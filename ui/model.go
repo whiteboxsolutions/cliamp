@@ -102,9 +102,7 @@ func fetchTracksCmd(client *navidrome.NavidromeClient, playlistID string) tea.Cm
 // Init starts the tick timer and requests the terminal size.
 func (m Model) Init() tea.Cmd {
 	cmds := []tea.Cmd{tickCmd(), tea.WindowSize()}
-	log.Printf("Setting up initial commands: \n %#v", m)
 	if m.navClient != nil {
-		log.Println("Fetching Navidrome Playlist")
 		cmds = append(cmds, fetchPlaylistsCmd(m.navClient))
 	}
 	return tea.Batch(cmds...)

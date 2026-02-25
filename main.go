@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -71,8 +70,6 @@ func run() error {
 	p := player.New(sr)
 	defer p.Close()
 
-	log.Printf("NavClient in Run: \n %#v", navClient)
-
 	// Launch the TUI with the client injected
 	m := ui.NewModel(p, pl, navClient)
 	prog := tea.NewProgram(m, tea.WithAltScreen())
@@ -118,20 +115,8 @@ func collectAudioFiles(path string) ([]string, error) {
 }
 
 func main() {
-	logFile, err := os.OpenFile("cliamp.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error opening log file: %v\n", err)
-		os.Exit(1)
-	}
-	defer logFile.Close()
-	log.SetOutput(logFile)
-	log.Println("=== CLIAMP Started ===")
-
 	if err := run(); err != nil {
-		log.Printf("Fatal error: %v\n", err)
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-
-	log.Println("=== CLIAMP Exited cleanly ===")
 }
