@@ -7,16 +7,17 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gopxl/beep/v2"
 
-	"winamp-cli/external/navidrome"
-	"winamp-cli/player"
-	"winamp-cli/playlist"
-	"winamp-cli/ui"
+	"cliamp/external/navidrome"
+	"cliamp/config"
+	"cliamp/player"
+	"cliamp/playlist"
+	"cliamp/ui"
 )
 
 // audioExts is the set of file extensions the player can decode.
@@ -25,6 +26,12 @@ var audioExts = map[string]bool{
 	".wav":  true,
 	".flac": true,
 	".ogg":  true,
+	".m4a":  true,
+	".aac":  true,
+	".m4b":  true,
+	".alac": true,
+	".wma":  true,
+	".opus": true,
 }
 
 func run() error {
@@ -67,12 +74,40 @@ func run() error {
 		pl.Add(playlist.TrackFromPath(f))
 	}
 
+	// Load user config
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("config: %w", err)
+	}
+
+	// Initialize audio engine at CD-quality sample rate
 	sr := beep.SampleRate(44100)
 	p := player.New(sr)
 	defer p.Close()
 
-	// Launch the TUI with the client injected
+	// Apply config
+	p.SetVolume(cfg.Volume)
+	if cfg.EQPreset == "" || cfg.EQPreset == "Custom" {
+		for i, gain := range cfg.EQ {
+			p.SetEQBand(i, gain)
+		}
+	}
+	switch cfg.Repeat {
+	case "all":
+		pl.CycleRepeat() // off -> all
+	case "one":
+		pl.CycleRepeat() // off -> all
+		pl.CycleRepeat() // all -> one
+	}
+	if cfg.Shuffle {
+		pl.ToggleShuffle()
+	}
+
+	// Launch the TUI
 	m := ui.NewModel(p, pl, provider)
+	if cfg.EQPreset != "" && cfg.EQPreset != "Custom" {
+		m.SetEQPreset(cfg.EQPreset)
+	}
 	prog := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := prog.Run(); err != nil {
 		return fmt.Errorf("tui: %w", err)
@@ -111,7 +146,7 @@ func collectAudioFiles(path string) ([]string, error) {
 		return nil, err
 	}
 
-	sort.Strings(files)
+	slices.Sort(files)
 	return files, nil
 }
 

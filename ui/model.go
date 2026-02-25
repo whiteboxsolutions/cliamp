@@ -7,8 +7,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"winamp-cli/player"
-	"winamp-cli/playlist"
+	"cliamp/player"
+	"cliamp/playlist"
 )
 
 type focusArea int
@@ -42,6 +42,8 @@ type Model struct {
 	providerLists []playlist.PlaylistInfo
 	provCursor    int
 	provLoading   bool
+	// EQ preset state (-1 = custom, 0+ = index into eqPresets)
+	eqPresetIdx int
 
 	// Search mode state
 	searching     bool
@@ -53,11 +55,49 @@ type Model struct {
 
 // NewModel creates a Model wired to the given player and playlist.
 func NewModel(p *player.Player, pl *playlist.Playlist, prov playlist.Provider) Model {
-	m := Model{
-		player:    p,
-		playlist:  pl,
-		vis:       NewVisualizer(44100),
-		plVisible: 5,
+  m := Model{
+		player:      p,
+		playlist:    pl,
+		vis:         NewVisualizer(44100),
+		plVisible:   5,
+		eqPresetIdx: -1, // custom until a preset is selected
+	}
+  if prov != nil {
+		m.provider = prov
+		m.focus = focusProvider
+		m.provLoading = true
+	}
+  return m
+}
+
+// SetEQPreset sets the preset index by name. Returns true if found.
+func (m *Model) SetEQPreset(name string) bool {
+	for i, p := range eqPresets {
+		if strings.EqualFold(p.Name, name) {
+			m.eqPresetIdx = i
+			m.applyEQPreset()
+			return true
+		}
+	}
+	return false
+}
+
+// EQPresetName returns the current preset name, or "Custom".
+func (m Model) EQPresetName() string {
+	if m.eqPresetIdx < 0 || m.eqPresetIdx >= len(eqPresets) {
+		return "Custom"
+	}
+	return eqPresets[m.eqPresetIdx].Name
+}
+
+// applyEQPreset writes the current preset's bands to the player.
+func (m *Model) applyEQPreset() {
+	if m.eqPresetIdx < 0 || m.eqPresetIdx >= len(eqPresets) {
+		return
+	}
+	bands := eqPresets[m.eqPresetIdx].Bands
+	for i, gain := range bands {
+		m.player.SetEQBand(i, gain)
 	}
 	if prov != nil {
 		m.provider = prov
