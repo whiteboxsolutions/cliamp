@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -13,6 +14,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gopxl/beep/v2"
 
+	"winamp-cli/external/navidrome"
 	"winamp-cli/player"
 	"winamp-cli/playlist"
 	"winamp-cli/ui"
@@ -27,8 +29,17 @@ var audioExts = map[string]bool{
 }
 
 func run() error {
-	if len(os.Args) < 2 {
-		return errors.New("usage: cliamp <file|folder> [...]")
+	navURL := os.Getenv("NAVIDROME_URL")
+	navUser := os.Getenv("NAVIDROME_USER")
+	navPass := os.Getenv("NAVIDROME_PASS")
+
+	var navClient *navidrome.NavidromeClient
+	if navURL != "" && navUser != "" && navPass != "" {
+		navClient = &navidrome.NavidromeClient{URL: navURL, User: navUser, Password: navPass}
+	}
+
+	if len(os.Args) < 2 && navClient == nil {
+		return errors.New("usage: cliamp <file|folder> [...] or set NAVIDROME_URL, NAVIDROME_USER, NAVIDROME_PASS")
 	}
 
 	// Expand shell globs and resolve directories into audio files
@@ -47,23 +58,23 @@ func run() error {
 		}
 	}
 
-	if len(files) == 0 {
-		return errors.New("no playable files found (supported: mp3, wav, flac, ogg)")
+	if len(files) == 0 && navClient == nil {
+		return errors.New("no playable files found")
 	}
 
-	// Build playlist from file arguments
 	pl := playlist.New()
 	for _, f := range files {
 		pl.Add(playlist.TrackFromPath(f))
 	}
 
-	// Initialize audio engine at CD-quality sample rate
 	sr := beep.SampleRate(44100)
 	p := player.New(sr)
 	defer p.Close()
 
-	// Launch the TUI
-	m := ui.NewModel(p, pl)
+	log.Printf("NavClient in Run: \n %#v", navClient)
+
+	// Launch the TUI with the client injected
+	m := ui.NewModel(p, pl, navClient)
 	prog := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := prog.Run(); err != nil {
 		return fmt.Errorf("tui: %w", err)
@@ -107,8 +118,20 @@ func collectAudioFiles(path string) ([]string, error) {
 }
 
 func main() {
+	logFile, err := os.OpenFile("cliamp.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error opening log file: %v\n", err)
+		os.Exit(1)
+	}
+	defer logFile.Close()
+	log.SetOutput(logFile)
+	log.Println("=== CLIAMP Started ===")
+
 	if err := run(); err != nil {
+		log.Printf("Fatal error: %v\n", err)
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+
+	log.Println("=== CLIAMP Exited cleanly ===")
 }

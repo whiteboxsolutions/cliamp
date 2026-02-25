@@ -2,11 +2,13 @@
 package ui
 
 import (
+	"log"
 	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"winamp-cli/external/navidrome"
 	"winamp-cli/player"
 	"winamp-cli/playlist"
 )
@@ -17,6 +19,7 @@ const (
 	focusPlaylist focusArea = iota
 	focusEQ
 	focusSearch
+	focusNavidrome
 )
 
 type tickMsg time.Time
@@ -37,6 +40,11 @@ type Model struct {
 	width     int
 	height    int
 
+	navClient    *navidrome.NavidromeClient
+	navPlaylists []navidrome.NavidromePlaylist
+	navCursor    int
+	navLoading   bool
+
 	// Search mode state
 	searching     bool
 	searchQuery   string
@@ -46,18 +54,60 @@ type Model struct {
 }
 
 // NewModel creates a Model wired to the given player and playlist.
-func NewModel(p *player.Player, pl *playlist.Playlist) Model {
-	return Model{
+func NewModel(p *player.Player, pl *playlist.Playlist, nc *navidrome.NavidromeClient) Model {
+	m := Model{
 		player:    p,
 		playlist:  pl,
 		vis:       NewVisualizer(44100),
 		plVisible: 5,
 	}
+	if nc != nil {
+		m.navClient = nc
+		m.focus = focusNavidrome
+		m.navLoading = true
+	}
+	return m
+}
+
+func fetchPlaylistsCmd(client *navidrome.NavidromeClient) tea.Cmd {
+	return func() tea.Msg {
+		pls, err := client.GetPlaylists()
+		if err != nil {
+			return err
+		}
+		return pls
+	}
+}
+
+type tracksLoadedMsg []playlist.Track
+
+func fetchTracksCmd(client *navidrome.NavidromeClient, playlistID string) tea.Cmd {
+	return func() tea.Msg {
+		tracks, err := client.GetPlaylistTracks(playlistID)
+		if err != nil {
+			return err
+		}
+		var pts []playlist.Track
+		for _, t := range tracks {
+			pts = append(pts, playlist.Track{
+				Path:   client.StreamURL(t.ID),
+				Title:  t.Title,
+				Artist: t.Artist,
+			})
+		}
+		return tracksLoadedMsg(pts)
+	}
 }
 
 // Init starts the tick timer and requests the terminal size.
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(tickCmd(), tea.WindowSize())
+	cmds := []tea.Cmd{tickCmd(), tea.WindowSize()}
+	log.Printf("Setting up initial commands: \n %#v", m)
+	if m.navClient != nil {
+		log.Println("Fetching Navidrome Playlist")
+		cmds = append(cmds, fetchPlaylistsCmd(m.navClient))
+	}
+	return tea.Batch(cmds...)
 }
 
 func tickCmd() tea.Cmd {
@@ -87,6 +137,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.titleOff++
 		return m, tickCmd()
+
+	case []navidrome.NavidromePlaylist:
+		m.navPlaylists = msg
+		m.navLoading = false
+		return m, nil
+
+	case tracksLoadedMsg:
+		m.playlist.Add(msg...)
+		m.focus = focusPlaylist
+		m.navLoading = false
+		if m.playlist.Len() > 0 {
+			m.playCurrentTrack()
+		}
+		return m, nil
+
+	case error:
+		m.err = msg
+		m.navLoading = false
+		return m, nil
 	}
 
 	return m, nil

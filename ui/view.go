@@ -179,6 +179,10 @@ func (m Model) renderEQ() string {
 }
 
 func (m Model) renderPlaylistHeader() string {
+	if m.focus == focusNavidrome {
+		return dimStyle.Render("── Navidrome Playlists ── ")
+	}
+
 	var shuffle string
 	if m.playlist.Shuffled() {
 		shuffle = activeToggle.Render("[Shuffle]")
@@ -202,6 +206,30 @@ func (m Model) renderPlaylistHeader() string {
 }
 
 func (m Model) renderPlaylist() string {
+	if m.focus == focusNavidrome {
+		if m.navLoading {
+			return dimStyle.Render("  Loading Navidrome...")
+		}
+		if len(m.navPlaylists) == 0 {
+			return dimStyle.Render("  No playlists found.")
+		}
+
+		visible := min(m.plVisible, len(m.navPlaylists))
+		scroll := max(0, m.navCursor-visible+1)
+
+		var lines []string
+		for j := scroll; j < scroll+visible && j < len(m.navPlaylists); j++ {
+			p := m.navPlaylists[j]
+			prefix, style := "  ", playlistItemStyle
+			if j == m.navCursor {
+				style = playlistSelectedStyle
+				prefix = "> "
+			}
+			lines = append(lines, style.Render(fmt.Sprintf("%s%s (%d tracks)", prefix, p.Name, p.Count)))
+		}
+		return strings.Join(lines, "\n")
+	}
+
 	tracks := m.playlist.Tracks()
 	if len(tracks) == 0 {
 		return dimStyle.Render("  No tracks loaded")
