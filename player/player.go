@@ -2,10 +2,10 @@ package player
 
 import (
 	"fmt"
-	"math"
-	"os"
 	"io"
-    "net/http"
+	"math"
+	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -264,8 +264,9 @@ func needsFFmpeg(ext string) bool {
 // decode selects the appropriate decoder based on the file extension.
 func decode(rc io.ReadCloser, path string, sr beep.SampleRate) (beep.StreamSeekCloser, beep.Format, error) {
 	ext := strings.ToLower(filepath.Ext(path))
-  if strings.Contains(path, "stream.view") || strings.Contains(path, "format=mp3") {
+	if strings.Contains(path, "stream.view") || strings.Contains(path, "format=mp3") {
 		ext = ".mp3"
+	}
 	if needsFFmpeg(ext) {
 		return decodeFFmpeg(path, sr)
 	}

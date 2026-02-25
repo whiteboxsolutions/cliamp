@@ -55,19 +55,19 @@ type Model struct {
 
 // NewModel creates a Model wired to the given player and playlist.
 func NewModel(p *player.Player, pl *playlist.Playlist, prov playlist.Provider) Model {
-  m := Model{
+	m := Model{
 		player:      p,
 		playlist:    pl,
 		vis:         NewVisualizer(44100),
 		plVisible:   5,
 		eqPresetIdx: -1, // custom until a preset is selected
 	}
-  if prov != nil {
+	if prov != nil {
 		m.provider = prov
 		m.focus = focusProvider
 		m.provLoading = true
 	}
-  return m
+	return m
 }
 
 // SetEQPreset sets the preset index by name. Returns true if found.
@@ -99,12 +99,6 @@ func (m *Model) applyEQPreset() {
 	for i, gain := range bands {
 		m.player.SetEQBand(i, gain)
 	}
-	if prov != nil {
-		m.provider = prov
-		m.focus = focusProvider
-		m.provLoading = true
-	}
-	return m
 }
 
 func fetchPlaylistsCmd(prov playlist.Provider) tea.Cmd {

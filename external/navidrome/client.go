@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"time"
 
-	"winamp-cli/playlist"
+	"cliamp/playlist"
 )
 
 type NavidromeClient struct {
