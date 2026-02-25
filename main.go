@@ -28,17 +28,18 @@ var audioExts = map[string]bool{
 }
 
 func run() error {
+	var provider playlist.Provider
+
 	navURL := os.Getenv("NAVIDROME_URL")
 	navUser := os.Getenv("NAVIDROME_USER")
 	navPass := os.Getenv("NAVIDROME_PASS")
 
-	var navClient *navidrome.NavidromeClient
 	if navURL != "" && navUser != "" && navPass != "" {
-		navClient = &navidrome.NavidromeClient{URL: navURL, User: navUser, Password: navPass}
+		provider = &navidrome.NavidromeClient{URL: navURL, User: navUser, Password: navPass}
 	}
 
-	if len(os.Args) < 2 && navClient == nil {
-		return errors.New("usage: cliamp <file|folder> [...] or set NAVIDROME_URL, NAVIDROME_USER, NAVIDROME_PASS")
+	if len(os.Args) < 2 && provider == nil {
+		return errors.New("usage: cliamp <file|folder> [...] or configure a provider via ENV\n\n - Navidrome: NAVIDROME_URL, NAVIDROME_USER, NAVIDROME_PASS\n")
 	}
 
 	// Expand shell globs and resolve directories into audio files
@@ -57,7 +58,7 @@ func run() error {
 		}
 	}
 
-	if len(files) == 0 && navClient == nil {
+	if len(files) == 0 && provider == nil {
 		return errors.New("no playable files found")
 	}
 
@@ -71,7 +72,7 @@ func run() error {
 	defer p.Close()
 
 	// Launch the TUI with the client injected
-	m := ui.NewModel(p, pl, navClient)
+	m := ui.NewModel(p, pl, provider)
 	prog := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := prog.Run(); err != nil {
 		return fmt.Errorf("tui: %w", err)

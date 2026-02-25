@@ -13,23 +13,29 @@ func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {
 		return m.handleSearchKey(msg)
 	}
 
-	if m.focus == focusNavidrome {
+	if m.focus == focusProvider {
 		switch msg.String() {
 		case "q", "ctrl+c":
 			m.player.Close()
 			m.quitting = true
 			return tea.Quit
 		case "up", "k":
-			if m.navCursor > 0 { m.navCursor-- }
+			if m.provCursor > 0 {
+				m.provCursor--
+			}
 		case "down", "j":
-			if m.navCursor < len(m.navPlaylists)-1 { m.navCursor++ }
+			if m.provCursor < len(m.providerLists)-1 {
+				m.provCursor++
+			}
 		case "enter":
-			if len(m.navPlaylists) > 0 && !m.navLoading {
-				m.navLoading = true
-				return fetchTracksCmd(m.navClient, m.navPlaylists[m.navCursor].ID)
+			if len(m.providerLists) > 0 && !m.provLoading {
+				m.provLoading = true
+				return fetchTracksCmd(m.provider, m.providerLists[m.provCursor].ID)
 			}
 		case "tab":
-			if m.playlist.Len() > 0 { m.focus = focusPlaylist }
+			if m.playlist.Len() > 0 {
+				m.focus = focusPlaylist
+			}
 		}
 		return nil
 	}

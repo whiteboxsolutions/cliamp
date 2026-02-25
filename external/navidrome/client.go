@@ -5,10 +5,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"time"
+
+	"winamp-cli/playlist"
 )
 
 type NavidromeClient struct {
@@ -29,6 +30,10 @@ type NavidromeTrack struct {
 	Artist string `json:"artist"`
 }
 
+func (c *NavidromeClient) Name() string {
+	return "Navidrome"
+}
+
 func (c *NavidromeClient) buildURL(endpoint string, params url.Values) string {
 	salt := fmt.Sprintf("%d", time.Now().UnixNano())
 	hash := md5.Sum([]byte(c.Password + salt))
@@ -47,21 +52,21 @@ func (c *NavidromeClient) buildURL(endpoint string, params url.Values) string {
 	return fmt.Sprintf("%s/rest/%s?%s", c.URL, endpoint, params.Encode())
 }
 
-func (c *NavidromeClient) GetPlaylists() ([]NavidromePlaylist, error) {
+func (c *NavidromeClient) Playlists() ([]playlist.PlaylistInfo, error) {
 	resp, err := http.Get(c.buildURL("getPlaylists", nil))
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("navidrome API error: %s", resp.Status)
-	}
-
 	var result struct {
 		SubsonicResponse struct {
 			Playlists struct {
-				Playlist []NavidromePlaylist `json:"playlist"`
+				Playlist []struct {
+					ID    string `json:"id"`
+					Name  string `json:"name"`
+					Count int    `json:"songCount"`
+				} `json:"playlist"`
 			} `json:"playlists"`
 		} `json:"subsonic-response"`
 	}
@@ -69,27 +74,32 @@ func (c *NavidromeClient) GetPlaylists() ([]NavidromePlaylist, error) {
 		return nil, err
 	}
 
-	return result.SubsonicResponse.Playlists.Playlist, nil
+	var lists []playlist.PlaylistInfo
+	for _, p := range result.SubsonicResponse.Playlists.Playlist {
+		lists = append(lists, playlist.PlaylistInfo{
+			ID:         p.ID,
+			Name:       p.Name,
+			TrackCount: p.Count,
+		})
+	}
+	return lists, nil
 }
 
-// GetPlaylistTracks fetches the tracks for a given playlist ID.
-func (c *NavidromeClient) GetPlaylistTracks(id string) ([]NavidromeTrack, error) {
-
+func (c *NavidromeClient) Tracks(id string) ([]playlist.Track, error) {
 	resp, err := http.Get(c.buildURL("getPlaylist", url.Values{"id": {id}}))
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("navidrome API error: %s", resp.Status)
-	}
-
 	var result struct {
 		SubsonicResponse struct {
 			Playlist struct {
-				Entry []NavidromeTrack `json:"entry"`
+				Entry []struct {
+					ID     string `json:"id"`
+					Title  string `json:"title"`
+					Artist string `json:"artist"`
+				} `json:"entry"`
 			} `json:"playlist"`
 		} `json:"subsonic-response"`
 	}
@@ -97,10 +107,18 @@ func (c *NavidromeClient) GetPlaylistTracks(id string) ([]NavidromeTrack, error)
 		return nil, err
 	}
 
-	return result.SubsonicResponse.Playlist.Entry, nil
+	var tracks []playlist.Track
+	for _, t := range result.SubsonicResponse.Playlist.Entry {
+		tracks = append(tracks, playlist.Track{
+			Path:   c.streamURL(t.ID),
+			Title:  t.Title,
+			Artist: t.Artist,
+		})
+	}
+	return tracks, nil
 }
 
 // StreamURL generates the authenticated streaming URL for a track ID.
-func (c *NavidromeClient) StreamURL(id string) string {
+func (c *NavidromeClient) streamURL(id string) string {
 	return c.buildURL("stream", url.Values{"id": {id}, "format": {"mp3"}})
 }

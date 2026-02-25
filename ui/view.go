@@ -179,8 +179,8 @@ func (m Model) renderEQ() string {
 }
 
 func (m Model) renderPlaylistHeader() string {
-	if m.focus == focusNavidrome {
-		return dimStyle.Render("── Navidrome Playlists ── ")
+	if m.focus == focusProvider {
+		return dimStyle.Render(fmt.Sprintf("── %s Playlists ── ", m.provider.Name()))
 	}
 
 	var shuffle string
@@ -206,26 +206,26 @@ func (m Model) renderPlaylistHeader() string {
 }
 
 func (m Model) renderPlaylist() string {
-	if m.focus == focusNavidrome {
-		if m.navLoading {
-			return dimStyle.Render("  Loading Navidrome...")
+	if m.focus == focusProvider {
+		if m.provLoading {
+			return dimStyle.Render(fmt.Sprintf("  Loading %s...", m.provider.Name()))
 		}
-		if len(m.navPlaylists) == 0 {
+		if len(m.providerLists) == 0 {
 			return dimStyle.Render("  No playlists found.")
 		}
 
-		visible := min(m.plVisible, len(m.navPlaylists))
-		scroll := max(0, m.navCursor-visible+1)
+		visible := min(m.plVisible, len(m.providerLists))
+		scroll := max(0, m.provCursor-visible+1)
 
 		var lines []string
-		for j := scroll; j < scroll+visible && j < len(m.navPlaylists); j++ {
-			p := m.navPlaylists[j]
+		for j := scroll; j < scroll+visible && j < len(m.providerLists); j++ {
+			p := m.providerLists[j]
 			prefix, style := "  ", playlistItemStyle
-			if j == m.navCursor {
+			if j == m.provCursor {
 				style = playlistSelectedStyle
 				prefix = "> "
 			}
-			lines = append(lines, style.Render(fmt.Sprintf("%s%s (%d tracks)", prefix, p.Name, p.Count)))
+			lines = append(lines, style.Render(fmt.Sprintf("%s%s (%d tracks)", prefix, p.Name, p.TrackCount)))
 		}
 		return strings.Join(lines, "\n")
 	}
